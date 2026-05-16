@@ -25,7 +25,7 @@ from pathlib import Path
 from ws_protocol import handshake, recv_frame, send_frame, serve_http
 
 # ── Configuração (via variáveis de ambiente para o Render) ───────────────────
-HOST             = "0.0.0.0"
+HOST             = os.environ.get("HOST", "0.0.0.0")
 PORT             = int(os.environ.get("PORT", 5000))
 SECONDARY_URL    = os.environ.get("SECONDARY_URL", "http://localhost:5001")
 HEARTBEAT_INTERVAL = 2   # segundos entre heartbeats ao secundário

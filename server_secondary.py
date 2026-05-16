@@ -21,7 +21,7 @@ from pathlib import Path
 from ws_protocol import handshake, recv_frame, send_frame, serve_http
 
 # ── Configuração ──────────────────────────────────────────────────────────────
-HOST              = "0.0.0.0"
+HOST              =os.environ.get("HOST", "0.0.0.0")
 PORT              = int(os.environ.get("PORT", 5001))
 HEARTBEAT_TIMEOUT = 6    # segundos sem heartbeat → primário considerado morto
 
