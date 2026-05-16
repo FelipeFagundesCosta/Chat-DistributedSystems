@@ -204,12 +204,10 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
  */
 
 // ── URLs dos servidores ────────────────────────────────────────────────────
-// Em produção (Cloudflare Pages + Render), substituir por:
-//   wss://chatnet-primary.onrender.com
-//   wss://chatnet-secondary.onrender.com
+// Em produção (S3 + Render), Render fornece WSS na porta 443 (implícita):
 const SERVERS = {
-  primary:   `wss://chat-distributedsystems.onrender.com:5000`,
-  secondary: `wss://chat-distributedsystems-secondary.onrender.com:5001`,
+  primary:   `wss://chat-distributedsystems.onrender.com`,
+  secondary: `wss://chat-distributedsystems-secondary.onrender.com`,
 };
 
 // ── Código do Web Worker (gerado inline como Blob) ─────────────────────────
