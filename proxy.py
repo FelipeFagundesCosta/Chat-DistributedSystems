@@ -19,6 +19,8 @@ Variáveis de ambiente:
   PROXY_PORT   — porta HTTP deste proxy (padrão: 8080)
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os

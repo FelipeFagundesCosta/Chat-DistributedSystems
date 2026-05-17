@@ -17,6 +17,8 @@ Variáveis de ambiente:
   PORT        — padrão 5000
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
