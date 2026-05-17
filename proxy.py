@@ -44,6 +44,17 @@ SERVER_HOST = os.environ.get("SERVER_HOST", "localhost")
 SERVER_PORT = int(os.environ.get("SERVER_PORT", 5000))
 PROXY_PORT  = int(os.environ.get("PROXY_PORT", 8080))
 
+# Em produção, passe algo como:
+#   SERVER_HOSTS=server-a.example.com:5000,server-b.example.com:5000
+SERVER_HOSTS = os.environ.get("SERVER_HOSTS", f"{SERVER_HOST}:{SERVER_PORT}")
+BACKEND_SERVERS: list[tuple[str, int]] = []
+for part in SERVER_HOSTS.split(","):
+    host, sep, port_text = part.strip().partition(":")
+    if not host:
+        continue
+    port = int(port_text) if sep and port_text.isdigit() else SERVER_PORT
+    BACKEND_SERVERS.append((host, port))
+
 FRONTEND_HTML = (Path(__file__).parent / "index.html").read_text(encoding="utf-8")
 
 logging.basicConfig(
@@ -82,10 +93,22 @@ class TCPSession:
         )
 
     def connect(self) -> None:
-        self._conn.connect((SERVER_HOST, SERVER_PORT))
-        self._conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self._recv_thread.start()
-        log.info("TCP conectado para sessão %s", self.session_id[:8])
+        last_exc = None
+        for host, port in BACKEND_SERVERS:
+            try:
+                self._conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._conn.connect((host, port))
+                self._conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                self._recv_thread.start()
+                log.info("TCP conectado para sessão %s -> %s:%d", self.session_id[:8], host, port)
+                return
+            except OSError as exc:
+                last_exc = exc
+                try:
+                    self._conn.close()
+                except OSError:
+                    pass
+        raise last_exc or OSError("Nenhum servidor TCP disponível")
 
     def send(self, **kwargs) -> None:
         """Envia um frame NDJSON para o servidor TCP."""
@@ -184,6 +207,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     # ── Roteamento ────────────────────────────────────────────────────────────
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._set_cors_headers()
+        self.end_headers()
+
     def do_GET(self):
         if self.path in ("/", "/index.html"):
             self._serve_html()
@@ -199,6 +227,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/login":
             self._handle_login()
+        elif self.path == "/resume":
+            self._handle_resume()
         elif self.path == "/message":
             self._handle_message()
         elif self.path == "/logout":
@@ -268,6 +298,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         sess = _get_session(sid)
         if not sess or sess.is_closed():
+            sess, _ = self._resume_session(sid)
+        if not sess:
             return self._write_json(401, {"error": "sessão inválida"})
 
         sess.send(type="message", text=text)
@@ -285,11 +317,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return self._write_json(400, {"error": "sid obrigatório"})
 
         sess = _get_session(sid)
+        if not sess or sess.is_closed():
+            sess, _ = self._resume_session(sid)
         if not sess:
             return self._write_json(401, {"error": "sessão inválida"})
 
         # Headers SSE
         self.send_response(200)
+        self._set_cors_headers()
         self.send_header("Content-Type",      "text/event-stream")
         self.send_header("Cache-Control",     "no-cache")
         self.send_header("Connection",        "keep-alive")
@@ -322,26 +357,61 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
         sess = _get_session(sid)
         if not sess or sess.is_closed():
+            sess, _ = self._resume_session(sid)
+        if not sess:
             return self._write_json(401, {"error": "sessão inválida"})
         # Lista usuários a partir das sessões ativas no proxy
         with _sessions_lock:
             count = len(_sessions)
         self._write_json(200, {"count": count})
 
+    def _handle_resume(self):
+        sid = self._get_sid()
+        if not sid:
+            return
+        sess, response = self._resume_session(sid)
+        if not sess:
+            return self._write_json(401, {"error": "sessão inválida"})
+
+        if response is None:
+            username = backend.get_username(sid)
+            if not username:
+                return self._write_json(401, {"error": "sessão inválida"})
+            response = {
+                "type": "welcome",
+                "session_id": sid,
+                "username": username,
+                "history": backend.get_history(),
+                "users": backend.get_online_users(),
+            }
+
+        self._write_json(200, response)
+
     def _handle_logout(self):
         sid = self._get_sid()
         if sid:
+            sess = _get_session(sid)
+            if sess and not sess.is_closed():
+                try:
+                    sess.send(type="logout")
+                except OSError:
+                    pass
             _remove_session(sid)
             log.info("Logout: sessão %s", sid[:8])
         self._write_json(200, {"ok": True})
 
     # ── Primitivas de I/O ─────────────────────────────────────────────────────
 
+    def _set_cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Session-Id")
+
     def _send_headers(self, code: int, content_type: str, length: int) -> None:
         self.send_response(code)
+        self._set_cors_headers()
         self.send_header("Content-Type",   content_type)
         self.send_header("Content-Length", str(length))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
     def _write(self, data: bytes) -> None:
@@ -378,6 +448,36 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if not sid:
             self._write_json(401, {"error": "X-Session-Id obrigatório"})
         return sid
+
+    def _resume_session(self, sid: str) -> tuple["TCPSession" | None, dict | None]:
+        sess = _get_session(sid)
+        if sess and not sess.is_closed():
+            return sess, None
+
+        try:
+            sess = TCPSession(sid)
+            sess.connect()
+        except OSError:
+            return None, None
+
+        q = sess.subscribe()
+        try:
+            sess.send(type="resume", session_id=sid)
+            response = q.get(timeout=10)
+        except (queue.Empty, TimeoutError):
+            sess.close()
+            return None, None
+        finally:
+            sess.unsubscribe(q)
+
+        if response.get("type") != "welcome":
+            sess.close()
+            return None, None
+
+        with _sessions_lock:
+            _sessions[sid] = sess
+        log.info("Sessão %s retomada com sucesso.", sid[:8])
+        return sess, response
 
     def log_message(self, fmt, *args):
         """Silencia logs de acesso HTTP no stdout (erros já aparecem via logging)."""

@@ -49,7 +49,8 @@ _senders_lock = threading.Lock()
 
 backend = RedisBackend(REDIS_URL)
 stop_event = threading.Event()
-
+_active_sessions: dict[str, 'ClientSession'] = {}
+_active_sessions_lock = threading.Lock()
 
 # ── Broadcast local ────────────────────────────────────────────────────────────
 
@@ -127,10 +128,46 @@ class ClientSession(threading.Thread):
 
                 typ = msg.get("type")
 
-                # ── Antes do login: só aceita login e ping ─────────────────
+                # ── Antes do login: só aceita login, resume e ping ─────────────────
                 if self._sid is None:
                     if typ == "ping":
                         self._send(type="pong", ts=time.time())
+                        continue
+
+                    if typ == "resume":
+                        session_id = str(msg.get("session_id", "")).strip()
+                        if not session_id:
+                            self._send(type="error", message="session_id obrigatório")
+                            continue
+
+                        username = backend.get_username(session_id)
+                        if not username:
+                            self._send(type="error", message="sessão expirada ou inválida")
+                            continue
+
+                        self._sid = session_id
+                        backend.refresh_session(session_id)
+                        with _active_sessions_lock:
+                            existing = _active_sessions.get(self._sid)
+                            if existing and existing is not self:
+                                existing.close()
+                            _active_sessions[self._sid] = self
+                        with _senders_lock:
+                            del _senders[tmp_key]
+                            _senders[session_id] = self._send_raw
+
+                        history = backend.get_history()
+                        users   = backend.get_online_users()
+
+                        self._send(
+                            type="welcome",
+                            session_id=session_id,
+                            username=username,
+                            history=history,
+                            users=users,
+                        )
+
+                        log.info("[↻] '%s' reconectou. Session: %s", username, session_id[:8])
                         continue
 
                     if typ != "login":
@@ -149,6 +186,11 @@ class ClientSession(threading.Thread):
 
                     # Login bem-sucedido — atualiza chave no registro global
                     self._sid = session_id
+                    with _active_sessions_lock:
+                        existing = _active_sessions.get(self._sid)
+                        if existing and existing is not self:
+                            existing.close()
+                        _active_sessions[self._sid] = self
                     with _senders_lock:
                         del _senders[tmp_key]
                         _senders[session_id] = self._send_raw
@@ -195,6 +237,13 @@ class ClientSession(threading.Thread):
                     backend.refresh_session(self._sid)
                     self._send(type="pong", ts=time.time())
 
+                elif typ == "logout":
+                    username = backend.remove_session(self._sid)
+                    if username:
+                        backend.publish({"type": "user_left", "username": username, "ts": time.time(), "users": backend.get_online_users()})
+                        log.info("[✖] '%s' desconectou via logout.", username)
+                    break
+
                 else:
                     self._send(type="error", message=f"tipo desconhecido: {typ!r}")
 
@@ -218,10 +267,12 @@ class ClientSession(threading.Thread):
             _senders.pop(key, None)
 
         if self._sid:
-            username = backend.remove_session(self._sid)
-            if username:
-                backend.publish({"type": "user_left", "username": username, "ts": time.time(), "users": backend.get_online_users()})
-                log.info("[✖] '%s' desconectou.", username)
+            with _active_sessions_lock:
+                if _active_sessions.get(self._sid) is self:
+                    _active_sessions.pop(self._sid, None)
+
+            # Não removemos automaticamente do Redis aqui.
+            # A sessão permanece válida por TTL para permitir reconexão a outra instância.
 
 
 # ── HTTP simples para health/ping ─────────────────────────────────────────────

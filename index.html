@@ -175,10 +175,23 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
 
 const $ = id => document.getElementById(id);
 
+// ── Configuração de failover ─────────────────────────────────────────────────
+const PROXY_HOSTS = [
+  window.location.origin,
+  // Se o front-end ficar no S3, troque por algo como:
+  // 'https://chat-proxy-a.example.com',
+  // 'https://chat-proxy-b.example.com',
+];
+const SESSION_STORAGE_KEY = 'chatnet-session';
+const REQUEST_TIMEOUT_MS = 10000;
+
 // ── Estado ─────────────────────────────────────────────────────────────────
 let sessionId = null;
 let myUsername = null;
 let eventSource = null;
+let currentProxyIndex = 0;
+let eventSourceFailureCount = 0;
+let eventSourceRetryTimer = null;
 
 // ── DOM ────────────────────────────────────────────────────────────────────
 const loginEl  = $('login'),   chatEl  = $('chat');
@@ -232,12 +245,117 @@ function setStatus(state) {
   stxt.textContent = label;
 }
 
+function saveSession(session) {
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+function loadSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  sessionId = null;
+  myUsername = null;
+}
+
+function currentProxyOrigin() {
+  return PROXY_HOSTS[currentProxyIndex % PROXY_HOSTS.length];
+}
+
+function switchProxyOrigin() {
+  currentProxyIndex = (currentProxyIndex + 1) % PROXY_HOSTS.length;
+  eventSourceFailureCount = 0;
+  addMsg({ type: 'system', text: `⚠ Tentando reconectar em ${currentProxyOrigin()}` });
+}
+
+async function request(path, options = {}) {
+  const init = { ...options };
+  let lastError = null;
+
+  for (let attempt = 0; attempt < PROXY_HOSTS.length; attempt += 1) {
+    const origin = PROXY_HOSTS[(currentProxyIndex + attempt) % PROXY_HOSTS.length];
+    const url = `${origin}${path}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const res = await fetch(url, { signal: controller.signal, ...init });
+      clearTimeout(timeout);
+      if (res.ok) {
+        currentProxyIndex = (currentProxyIndex + attempt) % PROXY_HOSTS.length;
+        return res;
+      }
+      lastError = res;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (lastError instanceof Response) {
+    return lastError;
+  }
+  throw lastError || new Error('Falha na requisição');
+}
+
+async function resumeSession() {
+  if (!sessionId) throw new Error('sessão ausente');
+  const res = await request('/resume', {
+    method: 'POST',
+    headers: { 'X-Session-Id': sessionId },
+  });
+  if (!res.ok) {
+    throw new Error((await res.json()).error || 'Não foi possível retomar a sessão');
+  }
+  return res.json();
+}
+
+async function startChatWithData(data, resumed = false) {
+  sessionId = data.session_id;
+  myUsername = data.username;
+  saveSession({ sessionId, username: myUsername });
+
+  loginEl.style.display = 'none';
+  chatEl.style.display  = 'flex';
+  protoTag.textContent  = '[TCP · NDJSON · SSE]';
+  msgIn.disabled        = false;
+  sendBtn.disabled      = false;
+
+  msgsEl.innerHTML = '';
+  (data.history || []).forEach(m =>
+    addMsg({ type: 'chat', username: m.username, text: m.text, ts: m.ts })
+  );
+  setUsers(data.users || []);
+
+  addMsg({ type: 'system', text: resumed ? `🔄 Reconectado como <b>${esc(myUsername)}</b>.` : `✅ Você entrou como <b>${esc(myUsername)}</b>.` });
+  startSSE(sessionId);
+}
+
+async function init() {
+  const stored = loadSession();
+  if (!stored?.sessionId || !stored?.username) {
+    return;
+  }
+
+  sessionId = stored.sessionId;
+  myUsername = stored.username;
+  try {
+    const data = await resumeSession();
+    await startChatWithData(data, true);
+  } catch {
+    clearSession();
+  }
+}
+
 // ── Login ──────────────────────────────────────────────────────────────────
 async function login(username) {
-  const res  = await fetch('/login', {
-    method:  'POST',
+  const res = await request('/login', {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ username }),
+    body: JSON.stringify({ username }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Erro no login');
@@ -245,10 +363,23 @@ async function login(username) {
 }
 
 // ── SSE — recepção de eventos ──────────────────────────────────────────────
+function closeEventSource() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  if (eventSourceRetryTimer) {
+    clearTimeout(eventSourceRetryTimer);
+    eventSourceRetryTimer = null;
+  }
+}
+
 function startSSE(sid) {
-  // EventSource é HTTP puro — NÃO é WebSocket
-  // O browser mantém a conexão aberta e o servidor envia eventos linha a linha
-  eventSource = new EventSource(`/events?sid=${sid}`);
+  closeEventSource();
+
+  const url = `${currentProxyOrigin()}/events?sid=${encodeURIComponent(sid)}`;
+  eventSource = new EventSource(url);
+  eventSourceFailureCount = 0;
 
   eventSource.onopen = () => {
     setStatus('on');
@@ -274,17 +405,26 @@ function startSSE(sid) {
   eventSource.onerror = () => {
     setStatus('wait');
     banner.style.display = 'block';
-    // EventSource reconecta automaticamente — não precisa fazer nada
+    eventSourceFailureCount += 1;
+    if (eventSourceFailureCount >= 3) {
+      switchProxyOrigin();
+      eventSourceRetryTimer = setTimeout(() => startSSE(sid), 600);
+    }
   };
 }
 
 async function fetchUsers() {
   // Busca lista de usuários online via HTTP normal
   try {
-    const res  = await fetch('/users', { headers: { 'X-Session-Id': sessionId } });
+    const res = await request('/users', {
+      headers: { 'X-Session-Id': sessionId },
+    });
+    if (!res.ok) return;
     const data = await res.json();
     setUsers(data.users || []);
-  } catch { /* silencia */ }
+  } catch {
+    /* silencia */
+  }
 }
 
 // ── Envio de mensagem ──────────────────────────────────────────────────────
@@ -293,18 +433,21 @@ async function sendMessage() {
   if (!text) return;
   msgIn.value = '';
 
-  // Envia via fetch POST — HTTP normal, sem WebSocket
   try {
-    await fetch('/message', {
-      method:  'POST',
+    const res = await request('/message', {
+      method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'X-Session-Id':  sessionId,
+        'Content-Type': 'application/json',
+        'X-Session-Id': sessionId,
       },
       body: JSON.stringify({ text }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      addMsg({ type: 'system', text: `⚠ ${data.error || 'Erro ao enviar mensagem.'}` });
+    }
   } catch (e) {
-    addMsg({ type: 'system', text: '⚠ Erro ao enviar mensagem.' });
+    addMsg({ type: 'system', text: `⚠ Erro ao enviar mensagem.` });
   }
 }
 
@@ -319,39 +462,23 @@ async function startChat(username) {
     return;
   }
 
-  sessionId  = data.session_id;
-  myUsername = data.username;
-
-  // Mostra tela de chat
-  loginEl.style.display = 'none';
-  chatEl.style.display  = 'flex';
-  protoTag.textContent  = '[TCP · NDJSON · SSE]';
-  msgIn.disabled        = false;
-  sendBtn.disabled      = false;
-
-  // Carrega histórico
-  (data.history || []).forEach(m =>
-    addMsg({ type: 'chat', username: m.username, text: m.text, ts: m.ts })
-  );
-
-  // Usuários online iniciais
-  setUsers(data.users || []);
-
-  addMsg({ type: 'system', text: `✅ Você entrou como <b>${esc(myUsername)}</b>.` });
-
-  // Inicia SSE para receber eventos em tempo real
-  startSSE(sessionId);
+  await startChatWithData(data, false);
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────
 async function logout() {
-  if (eventSource) { eventSource.close(); eventSource = null; }
+  if (eventSource) { closeEventSource(); }
   if (sessionId) {
-    await fetch('/logout', {
-      method: 'POST',
-      headers: { 'X-Session-Id': sessionId },
-    }).catch(() => {});
+    try {
+      await request('/logout', {
+        method: 'POST',
+        headers: { 'X-Session-Id': sessionId },
+      });
+    } catch {
+      /* ignora */
+    }
   }
+  clearSession();
   location.reload();
 }
 
@@ -370,6 +497,8 @@ msgIn.onkeydown   = e => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 };
 $('leave').onclick = logout;
+
+init();
 </script>
 </body>
 </html>
