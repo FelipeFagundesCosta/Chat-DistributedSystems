@@ -1,3 +1,1 @@
-# ChatNet — zero dependências externas
-# Tudo usa a stdlib do Python 3.11+
-# Nenhum pip install necessário.
+redis>=5.0.0

@@ -3,93 +3,71 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ChatNet</title>
+<title>ChatNet v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root {
-  --bg:      #0b0f17;
-  --surf:    #111827;
-  --surf2:   #1a2235;
-  --border:  #1f2d45;
-  --accent:  #22d3ee;   /* ciano */
-  --green:   #4ade80;
-  --amber:   #fbbf24;
-  --red:     #f87171;
-  --text:    #e2e8f0;
-  --muted:   #4b5e7a;
-  --radius:  8px;
-  --mono:    'Space Mono', monospace;
-  --ui:      'Syne', sans-serif;
+  --bg:     #0b0f17; --surf:   #111827; --surf2:  #1a2235;
+  --border: #1f2d45; --accent: #22d3ee; --green:  #4ade80;
+  --amber:  #fbbf24; --red:    #f87171; --text:   #e2e8f0;
+  --muted:  #4b5e7a; --radius: 8px;
+  --mono:   'Space Mono', monospace; --ui: 'Syne', sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);overflow:hidden}
-body::before{content:'';position:fixed;inset:0;background:
-  radial-gradient(ellipse at 15% 60%,rgba(34,211,238,.05) 0%,transparent 55%),
-  radial-gradient(ellipse at 85% 20%,rgba(74,222,128,.04) 0%,transparent 50%);
-  pointer-events:none;z-index:0}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 15% 60%,rgba(34,211,238,.05) 0%,transparent 55%),
+             radial-gradient(ellipse at 85% 20%,rgba(74,222,128,.04) 0%,transparent 50%)}
 
-/* ── Login ── */
+/* Login */
 #login{display:flex;align-items:center;justify-content:center;height:100vh;position:relative;z-index:1}
-.card{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:48px 52px;
-  width:min(400px,92vw);display:flex;flex-direction:column;gap:22px;
+.card{background:var(--surf);border:1px solid var(--border);border-radius:16px;
+  padding:48px 52px;width:min(400px,92vw);display:flex;flex-direction:column;gap:22px;
   box-shadow:0 0 80px rgba(34,211,238,.06)}
-.brand{text-align:center}
 .brand h1{font-family:var(--mono);font-size:2rem;font-weight:700;color:var(--accent);
-  letter-spacing:-1px;text-shadow:0 0 24px rgba(34,211,238,.35)}
+  letter-spacing:-1px;text-shadow:0 0 24px rgba(34,211,238,.3);text-align:center}
 .brand h1 span{color:var(--muted)}
-.brand p{color:var(--muted);font-size:.78rem;font-family:var(--mono);margin-top:6px}
+.brand p{color:var(--muted);font-size:.78rem;font-family:var(--mono);margin-top:6px;text-align:center}
 label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;
   letter-spacing:.1em;font-family:var(--mono);display:block;margin-bottom:6px}
-input,select{width:100%;background:var(--surf2);border:1px solid var(--border);
-  border-radius:var(--radius);color:var(--text);font-family:var(--mono);font-size:.9rem;
-  padding:11px 14px;outline:none;transition:border-color .2s,box-shadow .2s}
-input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,211,238,.12)}
-select option{background:var(--surf2)}
+input{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius);
+  color:var(--text);font-family:var(--mono);font-size:.9rem;padding:11px 14px;outline:none;
+  transition:border-color .2s,box-shadow .2s}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,211,238,.12)}
 #err{color:var(--red);font-size:.78rem;font-family:var(--mono);min-height:16px;text-align:center}
-.btn-primary{background:var(--accent);color:#000;border:none;border-radius:var(--radius);
+.btn{background:var(--accent);color:#000;border:none;border-radius:var(--radius);
   font-family:var(--mono);font-size:.88rem;font-weight:700;padding:13px;cursor:pointer;
-  letter-spacing:.04em;transition:opacity .2s,transform .1s}
-.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
-.btn-primary:active{transform:none}
-.btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  letter-spacing:.04em;transition:opacity .2s,transform .1s;width:100%}
+.btn:hover{opacity:.88;transform:translateY(-1px)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 
-/* ── Chat ── */
+/* Chat */
 #chat{display:none;flex-direction:column;height:100vh;position:relative;z-index:1}
-
-/* Header */
 header{display:flex;align-items:center;justify-content:space-between;
-  padding:12px 20px;background:var(--surf);border-bottom:1px solid var(--border);gap:10px;flex-shrink:0}
+  padding:12px 20px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0}
 .hlogo{font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--accent)}
-.status-pill{display:flex;align-items:center;gap:6px;font-size:.72rem;font-family:var(--mono);
+.pill{display:flex;align-items:center;gap:6px;font-size:.72rem;font-family:var(--mono);
   color:var(--muted);padding:4px 10px;background:var(--surf2);border-radius:20px;border:1px solid var(--border)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s}
 .dot.on{background:var(--green);box-shadow:0 0 7px var(--green)}
-.dot.ing{background:var(--amber);animation:blink 1s infinite}
 .dot.off{background:var(--red)}
-#srv-tag{font-size:.68rem;color:var(--muted);font-family:var(--mono)}
+.dot.wait{background:var(--amber);animation:blink 1s infinite}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);
-  border-radius:var(--radius);font-family:var(--mono);font-size:.72rem;padding:5px 11px;
-  cursor:pointer;transition:all .2s}
+  border-radius:var(--radius);font-family:var(--mono);font-size:.72rem;padding:5px 11px;cursor:pointer;transition:all .2s}
 .btn-ghost:hover{border-color:var(--red);color:var(--red)}
 
-/* Body */
 #body{display:flex;flex:1;overflow:hidden}
-
-/* Sidebar */
 aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
   display:flex;flex-direction:column;flex-shrink:0}
 .aside-title{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;
   letter-spacing:.1em;font-family:var(--mono);padding:14px 14px 10px;border-bottom:1px solid var(--border)}
 #ulist{list-style:none;padding:10px 0;overflow-y:auto;flex:1}
 #ulist li{display:flex;align-items:center;gap:7px;padding:6px 14px;
-  font-size:.78rem;font-family:var(--mono);color:var(--text);transition:background .15s}
-#ulist li:hover{background:var(--surf2)}
+  font-size:.78rem;font-family:var(--mono);color:var(--text)}
 #ulist li .udot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 #ulist li.me{color:var(--accent)}
-#ulist li.me .udot{box-shadow:0 0 6px var(--accent)}
 
-/* Messages */
 #msgs-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
 #msgs{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:9px}
 #msgs::-webkit-scrollbar{width:3px}
@@ -110,11 +88,8 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
 .ts{font-size:.62rem;color:var(--muted);font-family:var(--mono)}
 .txt{font-size:.87rem;word-break:break-word}
 
-/* Reconexão */
 #banner{display:none;background:#1c1200;border-top:1px solid var(--amber);
   color:var(--amber);font-family:var(--mono);font-size:.74rem;padding:7px 20px;text-align:center}
-
-/* Input */
 #input-area{padding:14px 20px;background:var(--surf);border-top:1px solid var(--border);
   display:flex;gap:9px;align-items:center;flex-shrink:0}
 #msg-in{flex:1;background:var(--surf2);border:1px solid var(--border);border-radius:var(--radius);
@@ -135,44 +110,35 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
 </head>
 <body>
 
-<!-- ══ Login ══════════════════════════════════════════════════════════════════ -->
+<!-- Login -->
 <div id="login">
   <div class="card">
     <div class="brand">
-      <h1><span>//</span>ChatNet</h1>
-      <p>chat distribuído · tolerância a falhas · sem instalação</p>
+      <h1><span>//</span>ChatNet <span style="font-size:1rem">v2</span></h1>
+      <p>TCP · NDJSON · SSE · Redis · sem WebSocket</p>
     </div>
     <div>
       <label for="uname">Seu apelido</label>
-      <input id="uname" type="text" placeholder="ex.: joao99" maxlength="24" autocomplete="off"/>
-    </div>
-    <div>
-      <label for="srv">Servidor</label>
-      <select id="srv">
-        <!-- Em produção: trocar pelos endereços do Render -->
-        <option value="primary">Primário  — localhost:5000</option>
-        <option value="secondary">Secundário — localhost:5001</option>
-      </select>
+      <input id="uname" type="text" placeholder="ex.: joao99" maxlength="32" autocomplete="off"/>
     </div>
     <div id="err"></div>
-    <button class="btn-primary" id="join-btn">Entrar →</button>
+    <button class="btn" id="join-btn">Entrar →</button>
   </div>
 </div>
 
-<!-- ══ Chat ════════════════════════════════════════════════════════════════════ -->
+<!-- Chat -->
 <div id="chat">
   <header>
     <div style="display:flex;align-items:center;gap:10px">
-      <span class="hlogo">//ChatNet</span>
-      <div class="status-pill">
-        <span class="dot ing" id="sdot"></span>
+      <span class="hlogo">//ChatNet v2</span>
+      <div class="pill">
+        <span class="dot wait" id="sdot"></span>
         <span id="stxt">conectando…</span>
       </div>
-      <span id="srv-tag"></span>
+      <span id="proto-tag" style="font-size:.68rem;color:var(--muted);font-family:var(--mono)"></span>
     </div>
     <button class="btn-ghost" id="leave">Sair</button>
   </header>
-
   <div id="body">
     <aside>
       <div class="aside-title">Online</div>
@@ -180,7 +146,7 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
     </aside>
     <div id="msgs-wrap">
       <div id="msgs"></div>
-      <div id="banner">⚠ Conexão perdida — tentando reconectar…</div>
+      <div id="banner">⚠ Reconectando SSE…</div>
       <div id="input-area">
         <input id="msg-in" type="text" placeholder="Mensagem… (Enter para enviar)" maxlength="500" disabled autocomplete="off"/>
         <button id="send" disabled>Enviar</button>
@@ -191,106 +157,59 @@ aside{width:190px;background:var(--surf);border-right:1px solid var(--border);
 
 <script>
 /**
- * client-side logic
- * =================
- * O browser É o cliente — não há client.py.
+ * Frontend ChatNet v2
+ * ===================
+ * Comunicação 100% via HTTP — zero WebSocket.
  *
- * Thread dedicada à recepção: implementada como Web Worker.
- * O Worker mantém o WebSocket em uma thread separada do browser
- * e comunica eventos à UI via postMessage().
+ * Envio:   fetch POST /message  (requisição HTTP normal)
+ * Recepção: EventSource GET /events?sid=...  (SSE — HTTP com conexão aberta)
  *
- * Reconexão automática: ao detectar queda, tenta o primário 2x,
- * depois tenta o secundário como fallback.
+ * EventSource é nativo do browser e não é WebSocket:
+ *   - Protocolo HTTP/1.1 padrão com Transfer-Encoding: chunked
+ *   - Unidirecional (servidor → cliente)
+ *   - Reconexão automática embutida no browser
+ *
+ * O envio de mensagens usa fetch() normal (POST HTTP).
+ * Não há WebSocket em lugar nenhum neste arquivo.
  */
 
-// ── URLs dos servidores ────────────────────────────────────────────────────
-// Em produção (S3 + Render), Render fornece WSS na porta 443 (implícita):
-const SERVERS = {
-  primary:   `wss://chat-distributedsystems.onrender.com`,
-  secondary: `wss://chat-distributedsystems-secondary.onrender.com`,
-};
-
-// ── Código do Web Worker (gerado inline como Blob) ─────────────────────────
-// Roda em thread separada — satisfaz o requisito de thread dedicada no cliente.
-const WORKER = `
-  let ws, username, primaryUrl, fallbackUrl, attempts = 0;
-  const MAX = 6, DELAY = 800;
-
-  function connect(url) {
-    ws = new WebSocket(url);
-
-    ws.onopen = () => {
-      attempts = 0;
-      ws.send(JSON.stringify({ type: 'join', username }));
-      postMessage({ e: 'open', url });
-    };
-
-    ws.onmessage = ({ data }) => postMessage({ e: 'msg', data });
-
-    ws.onclose = () => {
-      postMessage({ e: 'close' });
-      retry();
-    };
-
-    ws.onerror = () => {};
-  }
-
-  function retry() {
-    if (attempts >= MAX) { postMessage({ e: 'giveup' }); return; }
-    attempts++;
-    // Após 2 falhas no primário, tenta o secundário
-    const url = attempts > 2 && fallbackUrl ? fallbackUrl : primaryUrl;
-    if (attempts > 2 && fallbackUrl) postMessage({ e: 'fallback', url });
-    setTimeout(() => connect(url), DELAY * Math.min(attempts, 4));
-  }
-
-  self.onmessage = ({ data: { cmd, payload } }) => {
-    if (cmd === 'connect') {
-      username   = payload.username;
-      primaryUrl = payload.primary;
-      fallbackUrl= payload.fallback;
-      connect(primaryUrl);
-    }
-    if (cmd === 'send' && ws?.readyState === 1) ws.send(payload);
-    if (cmd === 'close' && ws) ws.close();
-  };
-`;
+const $ = id => document.getElementById(id);
 
 // ── Estado ─────────────────────────────────────────────────────────────────
-let worker, me;
+let sessionId = null;
+let myUsername = null;
+let eventSource = null;
 
 // ── DOM ────────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const loginEl = $('login'), chatEl = $('chat');
-const unameEl = $('uname'), srvEl = $('srv');
-const errEl   = $('err'),   joinBtn = $('join-btn');
-const msgsEl  = $('msgs'),  msgIn = $('msg-in'), sendBtn = $('send');
-const ulistEl = $('ulist'), banner = $('banner');
-const sdot    = $('sdot'),  stxt = $('stxt'), srvTag = $('srv-tag');
+const loginEl  = $('login'),   chatEl  = $('chat');
+const unameEl  = $('uname'),   errEl   = $('err'),   joinBtn = $('join-btn');
+const msgsEl   = $('msgs'),    msgIn   = $('msg-in'), sendBtn = $('send');
+const ulistEl  = $('ulist'),   banner  = $('banner');
+const sdot     = $('sdot'),    stxt    = $('stxt'),   protoTag = $('proto-tag');
 
-// ── Status visual ──────────────────────────────────────────────────────────
-function setStatus(state, label = '') {
-  sdot.className = 'dot ' + { connected: 'on', connecting: 'ing', disconnected: 'off' }[state];
-  stxt.textContent = { connected: 'conectado', connecting: 'conectando…', disconnected: 'desconectado' }[state];
-  if (label) srvTag.textContent = `[${label}]`;
-}
-
-// ── Renderização de mensagens ──────────────────────────────────────────────
+// ── Helpers de UI ──────────────────────────────────────────────────────────
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function addMsg({ type, username: u, text, timestamp: ts }) {
+function fmtTime(ts) {
+  if (!ts) return '';
+  return new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function addMsg({ type, username: u, text, ts }) {
   const el = document.createElement('div');
   if (type === 'system') {
     el.className = 'msg sys';
-    el.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+    el.innerHTML = `<div class="bubble">${text}</div>`;
   } else {
-    el.className = `msg ${u === me ? 'own' : 'other'}`;
+    el.className = `msg ${u === myUsername ? 'own' : 'other'}`;
     el.innerHTML = `
       <div class="meta">
         <span class="author">${esc(u)}</span>
-        <span class="ts">${ts || ''}</span>
+        <span class="ts">${fmtTime(ts)}</span>
       </div>
       <div class="bubble"><span class="txt">${esc(text)}</span></div>`;
   }
@@ -299,97 +218,158 @@ function addMsg({ type, username: u, text, timestamp: ts }) {
 }
 
 function setUsers(users) {
-  ulistEl.innerHTML = users.map(u =>
-    `<li class="${u===me?'me':''}">
-      <span class="udot"></span>${esc(u)}${u===me?' (você)':''}
+  ulistEl.innerHTML = (users || []).map(u =>
+    `<li class="${u===myUsername?'me':''}">
+      <span class="udot"></span>${esc(u)}${u===myUsername?' (você)':''}
     </li>`
   ).join('');
 }
 
-// ── Envio ──────────────────────────────────────────────────────────────────
-function send() {
-  const t = msgIn.value.trim();
-  if (!t || !worker) return;
-  worker.postMessage({ cmd: 'send', payload: JSON.stringify({ type: 'message', text: t }) });
-  msgIn.value = '';
+function setStatus(state) {
+  const map = { on: ['on','conectado'], off: ['off','desconectado'], wait: ['wait','conectando…'] };
+  const [cls, label] = map[state] || map.wait;
+  sdot.className = `dot ${cls}`;
+  stxt.textContent = label;
 }
 
-// ── Iniciar chat ───────────────────────────────────────────────────────────
-function startChat(name, srvChoice) {
-  me = name;
-  const primary  = srvChoice === 'primary'   ? SERVERS.primary : SERVERS.secondary;
-  const fallback = srvChoice === 'primary'   ? SERVERS.secondary : SERVERS.primary;
+// ── Login ──────────────────────────────────────────────────────────────────
+async function login(username) {
+  const res  = await fetch('/login', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ username }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Erro no login');
+  return data;
+}
 
-  const blob = new Blob([WORKER], { type: 'application/javascript' });
-  worker = new Worker(URL.createObjectURL(blob));
+// ── SSE — recepção de eventos ──────────────────────────────────────────────
+function startSSE(sid) {
+  // EventSource é HTTP puro — NÃO é WebSocket
+  // O browser mantém a conexão aberta e o servidor envia eventos linha a linha
+  eventSource = new EventSource(`/events?sid=${sid}`);
 
-  worker.onmessage = ({ data: msg }) => {
-    switch (msg.e) {
-      case 'open':
-        setStatus('connecting'); // aguarda 'joined' do servidor
-        banner.style.display = 'none';
-        break;
+  eventSource.onopen = () => {
+    setStatus('on');
+    banner.style.display = 'none';
+  };
 
-      case 'msg': {
-        const d = JSON.parse(msg.data);
-        if (d.type === 'joined') {
-          loginEl.style.display = 'none';
-          chatEl.style.display  = 'flex';
-          setStatus('connected', d.server);
-          msgIn.disabled = false;
-          sendBtn.disabled = false;
-          addMsg({ type: 'system', text: `✅ Você é <b>${esc(me)}</b> · servidor: ${esc(d.server)}` });
-        } else if (d.type === 'message') {
-          addMsg(d);
-        } else if (d.type === 'system') {
-          addMsg({ type: 'system', text: d.text });
-        } else if (d.type === 'user_list') {
-          setUsers(d.users || []);
-        } else if (d.type === 'error') {
-          errEl.textContent = d.text;
-          joinBtn.disabled = false;
-        }
-        break;
-      }
+  eventSource.onmessage = (e) => {
+    const ev = JSON.parse(e.data);
 
-      case 'close':
-        setStatus('disconnected');
-        msgIn.disabled = sendBtn.disabled = true;
-        banner.style.display = 'block';
-        break;
+    if (ev.type === 'chat') {
+      addMsg({ type: 'chat', username: ev.username, text: ev.text, ts: ev.ts });
 
-      case 'fallback':
-        banner.textContent = `⚠ Tentando servidor de backup: ${msg.url}`;
-        break;
+    } else if (ev.type === 'user_joined') {
+      addMsg({ type: 'system', text: `🟢 ${esc(ev.username)} entrou no chat.` });
+      if (ev.users) setUsers(ev.users);
 
-      case 'giveup':
-        banner.textContent = '❌ Sem conexão. Recarregue a página.';
-        addMsg({ type: 'system', text: '❌ Não foi possível reconectar.' });
-        break;
+    } else if (ev.type === 'user_left') {
+      addMsg({ type: 'system', text: `🔴 ${esc(ev.username)} saiu do chat.` });
+      if (ev.users) setUsers(ev.users);
     }
   };
 
-  worker.postMessage({ cmd: 'connect', payload: { username: name, primary, fallback } });
+  eventSource.onerror = () => {
+    setStatus('wait');
+    banner.style.display = 'block';
+    // EventSource reconecta automaticamente — não precisa fazer nada
+  };
+}
+
+async function fetchUsers() {
+  // Busca lista de usuários online via HTTP normal
+  try {
+    const res  = await fetch('/users', { headers: { 'X-Session-Id': sessionId } });
+    const data = await res.json();
+    setUsers(data.users || []);
+  } catch { /* silencia */ }
+}
+
+// ── Envio de mensagem ──────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = msgIn.value.trim();
+  if (!text) return;
+  msgIn.value = '';
+
+  // Envia via fetch POST — HTTP normal, sem WebSocket
+  try {
+    await fetch('/message', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'X-Session-Id':  sessionId,
+      },
+      body: JSON.stringify({ text }),
+    });
+  } catch (e) {
+    addMsg({ type: 'system', text: '⚠ Erro ao enviar mensagem.' });
+  }
+}
+
+// ── Iniciar chat ───────────────────────────────────────────────────────────
+async function startChat(username) {
+  let data;
+  try {
+    data = await login(username);
+  } catch (e) {
+    errEl.textContent = e.message;
+    joinBtn.disabled = false;
+    return;
+  }
+
+  sessionId  = data.session_id;
+  myUsername = data.username;
+
+  // Mostra tela de chat
+  loginEl.style.display = 'none';
+  chatEl.style.display  = 'flex';
+  protoTag.textContent  = '[TCP · NDJSON · SSE]';
+  msgIn.disabled        = false;
+  sendBtn.disabled      = false;
+
+  // Carrega histórico
+  (data.history || []).forEach(m =>
+    addMsg({ type: 'chat', username: m.username, text: m.text, ts: m.ts })
+  );
+
+  // Usuários online iniciais
+  setUsers(data.users || []);
+
+  addMsg({ type: 'system', text: `✅ Você entrou como <b>${esc(myUsername)}</b>.` });
+
+  // Inicia SSE para receber eventos em tempo real
+  startSSE(sessionId);
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────
+async function logout() {
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  if (sessionId) {
+    await fetch('/logout', {
+      method: 'POST',
+      headers: { 'X-Session-Id': sessionId },
+    }).catch(() => {});
+  }
+  location.reload();
 }
 
 // ── Eventos ────────────────────────────────────────────────────────────────
-$('join-btn').onclick = () => {
+joinBtn.onclick = () => {
   const n = unameEl.value.trim();
   if (!n) { errEl.textContent = 'Informe um apelido.'; return; }
   errEl.textContent = '';
   joinBtn.disabled = true;
-  startChat(n, srvEl.value);
+  startChat(n);
 };
 
-unameEl.onkeydown = e => { if (e.key === 'Enter') $('join-btn').click(); };
-sendBtn.onclick   = send;
-msgIn.onkeydown   = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
-
-$('leave').onclick = () => {
-  worker?.postMessage({ cmd: 'close' });
-  worker?.terminate();
-  location.reload();
+unameEl.onkeydown = e => { if (e.key === 'Enter') joinBtn.click(); };
+sendBtn.onclick   = sendMessage;
+msgIn.onkeydown   = e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 };
+$('leave').onclick = logout;
 </script>
 </body>
 </html>
